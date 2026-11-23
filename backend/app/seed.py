@@ -253,4 +253,10 @@ SEED_ROWS: dict[str, list[dict[str, Any]]] = {
          "目标Catalog": "hms_production", "同步范围": "全部",
          "同步状态": "失败-Schema冲突2处"},
     ],
+    # 跨目录受控列共享：授权单、核对记录、封存差异摘要、领用记录四张表，
+    # 初始为空，由 column_share 领域服务在业务流程中登记。
+    "column_share_grant": [],
+    "column_share_reconcile": [],
+    "column_share_report": [],
+    "column_share_claim": [],
 }

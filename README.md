@@ -16,9 +16,13 @@
 │   └── vite.config.ts        dev server 配置（open: false）
 ├── backend/                  FastAPI（Python） 后端
 │   ├── app/routers/resource.py  通用查询/导出/登记/动作接口
+│   ├── app/routers/column_share.py  跨目录受控列共享接口（授权/撤回/核对/封存/领用）
 │   ├── app/services/<key>.py    每个模块独立领域逻辑
+│   ├── app/services/column_share.py  受控列共享：授权时快照、无原值差异摘要、封存领用鉴权
 │   ├── app/services/base.py     共享服务骨架
-│   └── app/store.py          内存数据仓库与示例数据
+│   ├── app/store.py          内存数据仓库与示例数据
+│   ├── tests/test_column_share.py  受控列共享 20 条领域规则测试
+│   └── scripts/column_share_demo.py  授权→核对→封存→撤回→再核对→领用全链路回放
 ├── .gitignore
 └── docker-compose.yml
 ```
@@ -78,6 +82,32 @@ npm run dev
   `frontend/src/domain/<模块>.ts`，用于承载真实业务差异并维持36题位容量。
 - 列表接口统一返回 `{ items, total, page, size }`，动作接口统一返回 `{ ok, message }`。
 - 状态流转只允许在 `app/services` 里改，路由层不做业务判断。
+
+## 跨目录受控列共享（湖仓审计）
+
+湖仓审计新增列级跨目录共享能力，代码在 `app/services/column_share.py` 与
+`app/routers/column_share.py`，前端入口为「受控列共享」导航与湖仓审计页的
+「跨目录受控列共享」按钮。
+
+- 授权单按来源目录、目标目录、同名表、审计人、用途、收件组唯一区分，
+  来源/目标目录必须沿 `catalog_sync` 同步登记追溯，不接受未登记的跨目录关系。
+- 核对在开始时快照授权单**当时可读列**；从未授权的列禁止核对，已撤回的列
+  在新核对中不可读、不会被读取。
+- 封存摘要与领用交付只含已核验字段范围和每列差异数量（演示数据两列分别为
+  8 和 3），不含原值、不含差异行标识，无法反推单行内容。
+- 领用按封存时冻结的收件组快照与用途鉴权：封存时未获授权的收件人，即使
+  后来拿到新授权也不能领用旧报告。
+- `GET /api/column-share/approvers/{审批人}/scopes` 对照同一审批人的两个范围：
+  封存报告冻结范围 vs 授权单当前可读列；
+  `POST /api/column-share/reports/{id}/coverage` 对照交付覆盖列与新核对实际可读列。
+
+验证：
+
+```bash
+cd backend
+.venv/bin/python -m unittest discover -s tests     # 20 条领域规则
+.venv/bin/python scripts/column_share_demo.py      # 全链路场景回放
+```
 
 领域：数据工程
 子方向：数仓与数据湖
